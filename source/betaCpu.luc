@@ -1,0 +1,103 @@
+module betaCpu (
+    input clk,  // clock
+    input slowclk,
+    input rst,
+    input irq,
+    input instruction[32],
+    input memDataInput[32],
+    output ia[32],
+    output memDataAddress[32],
+    output memDataOutput[32],
+    output wr,
+    output debug[4][16]
+    
+) {
+    
+    controlUnit controlSystem(.clk(clk), .rst(rst))
+    alu aluSystem
+    regfileUnit regfileSystem(.clk(clk), .rst(rst))
+    pcUnit pcSystem(.clk(clk), .rst(rst))
+    
+    sig aselOut[32]
+    sig bselOut[32]
+    sig wdselOut[32]
+    
+    always {
+        
+        // Task 12
+        //***** CONTROL unit ******// 
+        controlSystem.irq = irq
+        controlSystem.ia31 = pcSystem.ia[31]
+        controlSystem.opcode = instruction[31:26]
+        controlSystem.z = regfileSystem.z
+        controlSystem.slowclk = slowclk
+        
+        //***** PC unit ******// 
+        pcSystem.slowclk = slowclk
+        pcSystem.reg_data_1 = regfileSystem.rd1
+        pcSystem.pcsel = controlSystem.pcsel
+        pcSystem.id = instruction[15:0]
+        
+        //***** REGFILE unit *****//
+        regfileSystem.slowclk = slowclk
+        regfileSystem.ra2sel = controlSystem.ra2sel
+        regfileSystem.wasel = controlSystem.wasel
+        regfileSystem.werf = controlSystem.werf
+        regfileSystem.ra = instruction[20:16]
+        regfileSystem.rb = instruction[15:11]
+        regfileSystem.rc = instruction[25:21]
+        
+        //****** ALU + WDSEL unit *******//
+        // ASEL mux
+        aluSystem.alufnSignal = controlSystem.alufn
+        case(controlSystem.asel){
+            b0:
+                aselOut = regfileSystem.rd1
+            b1:
+                aselOut = c{0, pcSystem.pc_4_sxtc[30:0]} // supervisor bit is ignored in LDR
+            default:
+                aselOut = regfileSystem.rd1
+        }
+        
+        // BSEL mux
+        case(controlSystem.bsel){
+            b0:
+                bselOut = regfileSystem.rd2
+            b1:
+                bselOut = c{16x{instruction[15]}, instruction[15:0]}
+            
+            default:
+                bselOut = regfileSystem.rd2
+        }
+        
+        // WDSEL mux
+        case(controlSystem.wdsel){
+            b00:
+                wdselOut = pcSystem.pc_4 // Supervisor bit is already protected in pc_unit
+            b01: 
+                wdselOut = aluSystem.out
+            b10:
+                wdselOut = memDataInput
+            default:
+                wdselOut = aluSystem.out
+        } 
+        
+        // connect asel, bsel, alu, and wdsel
+        aluSystem.a = aselOut
+        aluSystem.b = bselOut 
+        regfileSystem.wdselOut = wdselOut
+        
+        // output connections
+        ia = pcSystem.ia
+        memDataAddress = aluSystem.out
+        memDataOutput = regfileSystem.mwd
+        wr = controlSystem.wr
+        
+        // debug signals
+        debug[0][15:0] = pcSystem.pcsel_out[15:0]
+        debug[1][15:0] = aselOut[15:0]
+        debug[2][15:0] = bselOut[15:0]
+        debug[3][15:0] = wdselOut[15:0]
+        
+    }
+}

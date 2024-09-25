@@ -1,0 +1,70 @@
+module pcUnit (
+    input clk,  // clock
+    input rst,  // reset
+    input slowclk, // slowclock to advance pc
+    input id[16],
+    input pcsel[3],
+    input reg_data_1[32],
+    output pc_4[32],
+    output pc_4_sxtc[32],
+    output pcsel_out[32], // for debug only, does not exist in pc_unit
+    output ia[32]
+) {
+    
+    dff pc[32](#INIT(0),.clk(clk)) // PC Register
+    
+    sig pcselOutSig[32]
+    sig pc4Sxtc32Sig[32]
+    sig pc4SxtcSig[32]
+    sig pc4Sig[32]
+    sig pc4Raw[32]
+    
+    always {
+        
+        // increment pc by 4
+        pc4Raw = pc.q + 4
+        pc4Sig = c{pc.q[31], pc4Raw[30:0]}            
+        
+        // TASK 4
+        // shift-and-add pc by 4
+        pc4Sxtc32Sig = pc.q + 4 + (4 * c{16x{id[15]}, id[15:0]})
+        pc4SxtcSig = c{pc.q[31], pc4Sxtc32Sig[30:0]}
+        
+        // TASK 1 
+        // PCSEL mux 
+        case (pcsel){
+            b000: 
+                pcselOutSig = pc4Sig
+            b001:
+                pcselOutSig = pc4SxtcSig
+            b010:
+                // JMP mux to protect JT31
+                pcselOutSig = c{pc.q[31] & reg_data_1[31], reg_data_1[30:0]}
+            b011:
+                pcselOutSig = h80000004 // illop 
+            b100: 
+                pcselOutSig = h80000008 // irq 
+            default:
+                pcselOutSig = pc.q
+        }
+        
+        // advance the PC only when slowclk is 1 
+        if (slowclk){
+            pc.d = c{pcselOutSig[31:2], b00} // setting of pcreg content must happen only when slowclk == 1, don't bring this outside of if (slowclk) clause
+        }
+        
+        // Task 2
+        // RESET mux 
+        if (rst){
+            pc.d = h80000000 // reset can happen anytime regardless of slowclk
+        }
+        
+        // output connections
+        ia = pc.q
+        pc_4 =  pc4Sig
+        pc_4_sxtc = pc4SxtcSig
+        pcsel_out = pcselOutSig
+        
+        
+    }
+}
