@@ -1,4 +1,4 @@
-module regfileUnit (
+module regfile_unit (
     input clk,  // clock
     input rst,  // reset
     input ra[5],
@@ -7,7 +7,7 @@ module regfileUnit (
     input wasel,
     input ra2sel,
     input werf,
-    input wdselOut[32],
+    input wdsel_out[32],
     input slowclk,
     output z,
     output rd1[32],
@@ -15,9 +15,9 @@ module regfileUnit (
     output mwd[32]
   ) {
   
-  regfileMemory regfile(.clk(clk), .rst(rst));
-  sig ra2selOut[5];
-  sig waselOut[5];
+  regfile_memory regfile(.clk(clk), .rst(rst));
+  sig ra2sel_out[5];
+  sig wasel_out[5];
   
   always {
 
@@ -32,28 +32,28 @@ module regfileUnit (
     // RA2SEL mux
     case(ra2sel){
       b0:
-        ra2selOut = rb;
+        ra2sel_out = rb;
       b1:
-        ra2selOut = rc;
+        ra2sel_out = rc;
       default:
-        ra2selOut = rb;
+        ra2sel_out = rb;
     }
 
     // WASEL mux 
     case(wasel){
       b0:
-        waselOut = rc;
+        wasel_out = rc;
       b1:
-        waselOut = b11110;
+        wasel_out = b11110;
       default:
-        waselOut = rc;
+        wasel_out = rc;
     }
     
     // connections to regfile memory
-    regfile.ra2 = ra2selOut;
+    regfile.ra2 = ra2sel_out;
     regfile.ra1 = ra;
-    regfile.wa = waselOut;
-    regfile.wd = wdselOut;
+    regfile.wa = wasel_out;
+    regfile.wd = wdsel_out;
 
     // TASK 8
     // compute z 

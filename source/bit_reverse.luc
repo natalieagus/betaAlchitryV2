@@ -1,4 +1,4 @@
-module bitReverse #(
+module bit_reverse #(
     SIZE = 32  : SIZE > 0
     )
   (

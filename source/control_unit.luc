@@ -1,4 +1,4 @@
-module controlUnit (
+module control_unit (
     input clk,
     input irq, 
     input z,

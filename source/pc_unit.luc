@@ -1,4 +1,4 @@
-module pcUnit (
+module pc_unit (
     input clk,  // clock
     input rst,  // reset
     input slowclk, // slowclock to advance pc
@@ -13,44 +13,44 @@ module pcUnit (
     
     dff pc[32](#INIT(0),.clk(clk)) // PC Register
     
-    sig pcselOutSig[32]
-    sig pc4Sxtc32Sig[32]
-    sig pc4SxtcSig[32]
-    sig pc4Sig[32]
-    sig pc4Raw[32]
+    sig pcsel_out_sig[32]
+    sig pc_4sxtc3_2sig[32]
+    sig pc_4sxtc_sig[32]
+    sig pc_4sig[32]
+    sig pc_4raw[32]
     
     always {
         
         // increment pc by 4
-        pc4Raw = pc.q + 4
-        pc4Sig = c{pc.q[31], pc4Raw[30:0]}            
+        pc_4raw = pc.q + 4
+        pc_4sig = c{pc.q[31], pc_4raw[30:0]}            
         
         // TASK 4
         // shift-and-add pc by 4
-        pc4Sxtc32Sig = pc.q + 4 + (4 * c{16x{id[15]}, id[15:0]})
-        pc4SxtcSig = c{pc.q[31], pc4Sxtc32Sig[30:0]}
+        pc_4sxtc3_2sig = pc.q + 4 + (4 * c{16x{id[15]}, id[15:0]})
+        pc_4sxtc_sig = c{pc.q[31], pc_4sxtc3_2sig[30:0]}
         
         // TASK 1 
         // PCSEL mux 
         case (pcsel){
             b000: 
-                pcselOutSig = pc4Sig
+                pcsel_out_sig = pc_4sig
             b001:
-                pcselOutSig = pc4SxtcSig
+                pcsel_out_sig = pc_4sxtc_sig
             b010:
                 // JMP mux to protect JT31
-                pcselOutSig = c{pc.q[31] & reg_data_1[31], reg_data_1[30:0]}
+                pcsel_out_sig = c{pc.q[31] & reg_data_1[31], reg_data_1[30:0]}
             b011:
-                pcselOutSig = h80000004 // illop 
+                pcsel_out_sig = h80000004 // illop 
             b100: 
-                pcselOutSig = h80000008 // irq 
+                pcsel_out_sig = h80000008 // irq 
             default:
-                pcselOutSig = pc.q
+                pcsel_out_sig = pc.q
         }
         
         // advance the PC only when slowclk is 1 
         if (slowclk){
-            pc.d = c{pcselOutSig[31:2], b00} // setting of pcreg content must happen only when slowclk == 1, don't bring this outside of if (slowclk) clause
+            pc.d = c{pcsel_out_sig[31:2], b00} // setting of pcreg content must happen only when slowclk == 1, don't bring this outside of if (slowclk) clause
         }
         
         // Task 2
@@ -61,9 +61,9 @@ module pcUnit (
         
         // output connections
         ia = pc.q
-        pc_4 =  pc4Sig
-        pc_4_sxtc = pc4SxtcSig
-        pcsel_out = pcselOutSig
+        pc_4 =  pc_4sig
+        pc_4_sxtc = pc_4sxtc_sig
+        pcsel_out = pcsel_out_sig
         
         
     }

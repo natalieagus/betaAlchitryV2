@@ -1,4 +1,4 @@
-module regfileMemory (
+module regfile_memory (
     input clk,  // clock
     input rst, // reset
     input ra1[5],

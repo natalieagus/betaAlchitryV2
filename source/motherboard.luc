@@ -8,43 +8,43 @@ module motherboard (
     output ma[32],  // ALU output / EA
     output mrd[32], // Mem[EA]
     output mwd[32], // RD2 output 
-    output outputBuffer[32],
-    output inputBuffer[32],
+    output output_buffer[32],
+    output input_buffer[32],
     output debug[4][16]
 ) {
     
     // Beta CPU
-    betaCpu beta(.clk(clk))
+    beta_cpu beta(.clk(clk))
     
     // setup and instantiate memory unit and instruction ROM
     const MEMORY_SIZE = 32
-    instructionRom instructionUnit(#WORDS(MEMORY_SIZE))
-    memoryUnit memoryUnit(#WORDS(MEMORY_SIZE), .clk(clk)) 
+    instruction_rom instruction_unit(#WORDS(MEMORY_SIZE))
+    memory_unit memory_unit(#WORDS(MEMORY_SIZE), .clk(clk)) 
     
     // prepare output buffer
-    dff systemOutputBuffer[32](.clk(clk), .rst(rst)) // 32 bit beta output buffer, hardwired to always read memoryUnit value at byte address 0xC
+    dff system_output_buffer[32](.clk(clk), .rst(rst)) // 32 bit beta output buffer, hardwired to always read memory_unit value at byte address 0xC
     // prepare input buffer
-    dff systemInputBuffer[32](.clk(clk), .rst(rst)) // 32 bit beta input buffer, hardwired to always write memoryUnit value at byte address 0x10
+    dff system_input_buffer[32](.clk(clk), .rst(rst)) // 32 bit beta input buffer, hardwired to always write memory_unit value at byte address 0x10
     
     // counter to write instructions from ROM to instruction memory
-    dff writerCounter[$clog2(MEMORY_SIZE)](.clk(clk))
+    dff writer_counter[$clog2(MEMORY_SIZE)](.clk(clk))
     enum MotherboardStates {INSTRUCTIONLOAD, RUN, LOAD_OUTPUT, DISPLAY_OUTPUT, UPDATE_INPUT}
     dff motherboard[$width(MotherboardStates)](.clk(clk), .rst(rst), #INIT(MotherboardStates.INSTRUCTIONLOAD))
     
     always {
-        instructionUnit.addr = 0 // always set to 0 initially
+        instruction_unit.addr = 0 // always set to 0 initially
         beta.irq = |irq // IRQ as long as any of of the buttons[2:0] is pressed
         
         // store the button press to input buffer 
         if (|irq){
             if (irq[0]){
-                systemInputBuffer.d = 32hB0
+                system_input_buffer.d = 32hB0
             }
             else if (irq[1]){
-                systemInputBuffer.d = 32hB1
+                system_input_buffer.d = 32hB1
             }
             else if (irq[2]){
-                systemInputBuffer.d = 32hB2
+                system_input_buffer.d = 32hB2
             }
         }
         
@@ -52,29 +52,29 @@ module motherboard (
         beta.rst = rst
         
         // connect memory unit with beta 
-        beta.instruction = memoryUnit.id
-        beta.memDataInput = memoryUnit.mrd
-        memoryUnit.ia = beta.ia[31:0] 
-        memoryUnit.wd = beta.memDataOutput 
-        memoryUnit.we = beta.wr 
-        memoryUnit.waddr = beta.memDataAddress[31:0] 
-        memoryUnit.raddr = beta.memDataAddress[31:0] 
+        beta.instruction = memory_unit.id
+        beta.mem_data_input = memory_unit.mrd
+        memory_unit.ia = beta.ia[31:0] 
+        memory_unit.wd = beta.mem_data_output 
+        memory_unit.we = beta.wr 
+        memory_unit.waddr = beta.mem_data_address[31:0] 
+        memory_unit.raddr = beta.mem_data_address[31:0] 
         
         // turn off instruction loading
-        memoryUnit.instructionWE = b0
-        memoryUnit.instructionWD = 32b0 
+        memory_unit.instruction_we = b0
+        memory_unit.instruction_wd = 32b0 
         
         // Load ROM instructions to RAM first, then run the Beta 
         case(motherboard.q){
             // instruction loading
             MotherboardStates.INSTRUCTIONLOAD:
                 beta.rst = 1
-                writerCounter.d = writerCounter.q + 1
-                instructionUnit.addr = writerCounter.q
-                memoryUnit.instructionWD = instructionUnit.out
-                memoryUnit.instructionWE = b1
-                memoryUnit.ia = writerCounter.q<<2 // pad with two zeroes to make it byte addressable because memoryUnit expects byte addresing ia
-                if ((writerCounter.q + 1) == MEMORY_SIZE){
+                writer_counter.d = writer_counter.q + 1
+                instruction_unit.addr = writer_counter.q
+                memory_unit.instruction_wd = instruction_unit.out
+                memory_unit.instruction_we = b1
+                memory_unit.ia = writer_counter.q<<2 // pad with two zeroes to make it byte addressable because memory_unit expects byte addresing ia
+                if ((writer_counter.q + 1) == MEMORY_SIZE){
                     motherboard.d = MotherboardStates.RUN // wait one more clock cycle to allow the last instruction to be loaded before start execution
                 }
             
@@ -92,31 +92,31 @@ module motherboard (
             
             MotherboardStates.LOAD_OUTPUT:
                 // load hardcoded byte address 32hC (12) for output 
-                memoryUnit.raddr = 32hC
+                memory_unit.raddr = 32hC
                 motherboard.d = MotherboardStates.DISPLAY_OUTPUT
             
             MotherboardStates.DISPLAY_OUTPUT:
                 // display Mem[12] to beta_output_buffer for user to see
-                systemOutputBuffer.d = memoryUnit.mrd // Note: a little bit janky in simulation, will sometimes overwrite 
+                system_output_buffer.d = memory_unit.mrd // Note: a little bit janky in simulation, will sometimes overwrite 
                 motherboard.d = MotherboardStates.UPDATE_INPUT
             
             MotherboardStates.UPDATE_INPUT:
                 // always store hardcoded byte address 32h10 (16) for any incoming input each time "next" happens
                 // need 2x original clock cycles for data to be readable at 32h10, plenty of time since "next" is more than 2 cycles
-                memoryUnit.waddr = 32h10
-                memoryUnit.wd = systemInputBuffer.q
-                memoryUnit.we = 1
+                memory_unit.waddr = 32h10
+                memory_unit.wd = system_input_buffer.q
+                memory_unit.we = 1
                 motherboard.d = MotherboardStates.RUN
         }
         
         // output values
-        outputBuffer = systemOutputBuffer.q
-        inputBuffer = systemInputBuffer.q
+        output_buffer = system_output_buffer.q
+        input_buffer = system_input_buffer.q
         ia = beta.ia
-        id = memoryUnit.id
-        ma = beta.memDataAddress
-        mrd = memoryUnit.mrd
-        mwd = beta.memDataOutput
+        id = memory_unit.id
+        ma = beta.mem_data_address
+        mrd = memory_unit.mrd
+        mwd = beta.mem_data_output
         debug = beta.debug
         
     }

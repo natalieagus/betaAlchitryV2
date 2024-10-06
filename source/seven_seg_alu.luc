@@ -1,4 +1,4 @@
-module sevenSegAlu (
+module seven_seg_alu (
     input char[3],
     output segs[7]
 ) {
